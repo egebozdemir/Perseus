@@ -1,10 +1,7 @@
 # Perseus
 
-**Manage test markers across test suites.**
-
 Perseus is a CLI tool to help you search, add, remove, or modify test markers and keywords across multiple Python test files.
 
----
 
 ## ✨ Features
 
@@ -13,7 +10,7 @@ Perseus is a CLI tool to help you search, add, remove, or modify test markers an
 - **Safety**: Interactive confirmation & dry-run previews before applying changes.
 - **Output**: Filename filtering and formatting options.
 
----
+
 
 ## 🚀 Usage
 
@@ -35,6 +32,7 @@ You can also run tests with verbose output:
 ```bash
 python3 -m unittest -v test_perseus.py
 ```
+
 
 ## 🐍 Requirements
 - Python: 3.8 or higher (check with `python3 --version`)
