@@ -7,7 +7,7 @@ from typing import List, Dict, Tuple, Optional, Callable
 
 
 class Perseus:
-    def __init__(self, search_path: str, keywords: List[str], exclude_keywords: Optional[List[str]] = None):
+        def __init__(self, search_path: str, keywords: List[str], exclude_keywords: Optional[List[str]] = None):
         """Initialize with search path and keywords to find"""
         self.search_path = os.path.abspath(search_path)
         self.keywords = [k.lower() for k in keywords]
@@ -77,9 +77,11 @@ class Perseus:
             else:
                 print(line, end='')
 
-    def bulk_replace(self, old: str, new: str, dry_run: bool = False) -> int:
+    def bulk_replace(self, old: str, new: str, dry_run: bool = False, bulk_confirm: bool = False) -> int:
         """Replace text with confirmation and diff preview"""
         modified = 0
+        changes = []
+
         for filepath in self.matches:
             try:
                 with open(filepath, 'r') as f:
@@ -88,28 +90,54 @@ class Perseus:
                 updated = [line.replace(old, new) for line in original]
 
                 if original != updated:
-                    print(f"\n File: {filepath}")
-                    self._show_changes(original, updated)
+                    changes.append((filepath, original, updated))
+            except Exception as e:
+                print(f"Error processing {filepath}: {str(e)}")
 
-                    if not dry_run and self._confirm_action(f"Replace '{old}' with '{new}'"):
+        if not changes:
+            print("No changes needed.")
+            return 0
+
+        print(f"\nFound {len(changes)} files that would be modified:")
+        for filepath, original, updated in changes:
+            print(f"\nFile: {filepath}")
+            self._show_changes(original, updated)
+
+        if not dry_run:
+            if bulk_confirm:
+                if not self._confirm_action(f"Replace '{old}' with '{new}' in {len(changes)} files"):
+                    print("Skipped (user canceled bulk operation)")
+                    return 0
+            else:
+                print("\nProcessing files individually...")
+
+        for filepath, original, updated in changes:
+            if not dry_run:
+                if bulk_confirm or self._confirm_action(f"Replace '{old}' with '{new}' in {filepath}"):
+                    try:
                         with open(filepath, 'w') as f:
                             f.writelines(updated)
                         modified += 1
-                        print("Update applied")
-                    else:
-                        print("Skipped (dry-run or user canceled)")
-            except Exception as e:
-                print(f"Error processing {filepath}: {str(e)}")
+                        print(f"Updated {filepath}")
+                    except Exception as e:
+                        print(f"Error updating {filepath}: {str(e)}")
+                else:
+                    print(f"Skipped {filepath}")
+            else:
+                print(f"[Dry-run] Would update {filepath}")
+
         return modified
 
-    def bulk_remove_keyword(self, keyword: str, dry_run: bool = False) -> int:
+    def bulk_remove_keyword(self, keyword: str, dry_run: bool = False, bulk_confirm: bool = False) -> int:
         """Remove keyword with confirmation"""
-        return self.bulk_replace(keyword, "", dry_run)
+        return self.bulk_replace(keyword, "", dry_run, bulk_confirm)
 
     def bulk_add_keyword(self, keyword: str, condition: Optional[Callable[[str], bool]] = None,
-                         dry_run: bool = False) -> int:
+                         dry_run: bool = False, bulk_confirm: bool = False) -> int:
         """Add keyword to matching lines with confirmation"""
         modified = 0
+        changes = []
+
         for filepath in self.matches:
             try:
                 with open(filepath, 'r') as f:
@@ -123,23 +151,49 @@ class Perseus:
                         updated.append(line)
 
                 if original != updated:
-                    print(f"\nFile: {filepath}")
-                    self._show_changes(original, updated)
+                    changes.append((filepath, original, updated))
+            except Exception as e:
+                print(f"Error processing {filepath}: {str(e)}")
 
-                    if not dry_run and self._confirm_action(f"Add '{keyword}'"):
+        if not changes:
+            print("No changes needed.")
+            return 0
+
+        print(f"\nFound {len(changes)} files that would be modified:")
+        for filepath, original, updated in changes:
+            print(f"\nFile: {filepath}")
+            self._show_changes(original, updated)
+
+        if not dry_run:
+            if bulk_confirm:
+                if not self._confirm_action(f"Add '{keyword}' in {len(changes)} files"):
+                    print("Skipped (user canceled bulk operation)")
+                    return 0
+            else:
+                print("\nProcessing files individually...")
+
+        for filepath, original, updated in changes:
+            if not dry_run:
+                if bulk_confirm or self._confirm_action(f"Add '{keyword}' in {filepath}"):
+                    try:
                         with open(filepath, 'w') as f:
                             f.writelines(updated)
                         modified += 1
-                        print("Update applied")
-                    else:
-                        print("Skipped (dry-run or user canceled)")
-            except Exception as e:
-                print(f"Error processing {filepath}: {str(e)}")
+                        print(f"Updated {filepath}")
+                    except Exception as e:
+                        print(f"Error updating {filepath}: {str(e)}")
+                else:
+                    print(f"Skipped {filepath}")
+            else:
+                print(f"[Dry-run] Would update {filepath}")
+
         return modified
 
-    def bulk_remove_lines(self, keyword: str, dry_run: bool = False) -> int:
+    def bulk_remove_lines(self, keyword: str, dry_run: bool = False, bulk_confirm: bool = False) -> int:
         """Remove entire lines containing the keyword with confirmation"""
         modified = 0
+        changes = []
+
         for filepath in self.matches:
             try:
                 with open(filepath, 'r') as f:
@@ -148,23 +202,50 @@ class Perseus:
                 updated = [line for line in original if keyword.lower() not in line.lower()]
 
                 if len(original) != len(updated):
-                    print(f"\n File: {filepath}")
-                    self._show_changes(original, updated)
+                    changes.append((filepath, original, updated))
+            except Exception as e:
+                print(f"Error processing {filepath}: {str(e)}")
 
-                    if not dry_run and self._confirm_action(f"Remove all lines containing '{keyword}'"):
+        if not changes:
+            print("No changes needed.")
+            return 0
+
+        print(f"\nFound {len(changes)} files that would be modified:")
+        for filepath, original, updated in changes:
+            print(f"\nFile: {filepath}")
+            self._show_changes(original, updated)
+
+        if not dry_run:
+            if bulk_confirm:
+                if not self._confirm_action(f"Remove lines containing '{keyword}' in {len(changes)} files"):
+                    print("Skipped (user canceled bulk operation)")
+                    return 0
+            else:
+                print("\nProcessing files individually...")
+
+        for filepath, original, updated in changes:
+            if not dry_run:
+                if bulk_confirm or self._confirm_action(f"Remove lines containing '{keyword}' in {filepath}"):
+                    try:
                         with open(filepath, 'w') as f:
                             f.writelines(updated)
                         modified += 1
-                        print("Removed lines")
-                    else:
-                        print("Skipped (dry-run or user canceled)")
-            except Exception as e:
-                print(f"Error processing {filepath}: {str(e)}")
+                        print(f"Updated {filepath}")
+                    except Exception as e:
+                        print(f"Error updating {filepath}: {str(e)}")
+                else:
+                    print(f"Skipped {filepath}")
+            else:
+                print(f"[Dry-run] Would update {filepath}")
+
         return modified
 
-    def bulk_replace_lines(self, old_line: str, new_line: str, dry_run: bool = False) -> int:
+    def bulk_replace_lines(self, old_line: str, new_line: str, dry_run: bool = False,
+                           bulk_confirm: bool = False) -> int:
         """Replace entire lines containing old_line with new_line"""
         modified = 0
+        changes = []
+
         for filepath in self.matches:
             try:
                 with open(filepath, 'r') as f:
@@ -178,23 +259,50 @@ class Perseus:
                         updated.append(line)
 
                 if original != updated:
-                    print(f"\n File: {filepath}")
-                    self._show_changes(original, updated)
+                    changes.append((filepath, original, updated))
+            except Exception as e:
+                print(f"Error processing {filepath}: {str(e)}")
 
-                    if not dry_run and self._confirm_action(f"Replace lines containing '{old_line}' with '{new_line}'"):
+        if not changes:
+            print("No changes needed.")
+            return 0
+
+        print(f"\nFound {len(changes)} files that would be modified:")
+        for filepath, original, updated in changes:
+            print(f"\nFile: {filepath}")
+            self._show_changes(original, updated)
+
+        if not dry_run:
+            if bulk_confirm:
+                if not self._confirm_action(f"Replace lines containing '{old_line}' in {len(changes)} files"):
+                    print("Skipped (user canceled bulk operation)")
+                    return 0
+            else:
+                print("\nProcessing files individually...")
+
+        for filepath, original, updated in changes:
+            if not dry_run:
+                if bulk_confirm or self._confirm_action(f"Replace lines containing '{old_line}' in {filepath}"):
+                    try:
                         with open(filepath, 'w') as f:
                             f.writelines(updated)
                         modified += 1
-                        print("Lines replaced")
-                    else:
-                        print("Skipped (dry-run or user canceled)")
-            except Exception as e:
-                print(f"Error processing {filepath}: {str(e)}")
+                        print(f"Updated {filepath}")
+                    except Exception as e:
+                        print(f"Error updating {filepath}: {str(e)}")
+                else:
+                    print(f"Skipped {filepath}")
+            else:
+                print(f"[Dry-run] Would update {filepath}")
+
         return modified
 
-    def bulk_add_after(self, match_keyword: str, new_line: str, first_only: bool = False, dry_run: bool = False) -> int:
+    def bulk_add_after(self, match_keyword: str, new_line: str, first_only: bool = False,
+                       dry_run: bool = False, bulk_confirm: bool = False) -> int:
         """Add a new line after each line containing match_keyword"""
         modified = 0
+        changes = []
+
         for filepath in self.matches:
             try:
                 with open(filepath, 'r') as f:
@@ -215,24 +323,50 @@ class Perseus:
                             break
 
                 if inserted and lines != updated_lines:
-                    print(f"\nFile: {filepath}")
-                    self._show_changes(lines, updated_lines)
-
-                    if not dry_run and self._confirm_action(f"Add line after '{match_keyword}'"):
-                        with open(filepath, 'w') as f:
-                            f.writelines(updated_lines)
-                        modified += 1
-                        print("Line(s) added")
-                    else:
-                        print("Skipped (dry-run or user canceled)")
+                    changes.append((filepath, lines, updated_lines))
             except Exception as e:
                 print(f"Error processing {filepath}: {str(e)}")
+
+        if not changes:
+            print("No changes needed.")
+            return 0
+
+        print(f"\nFound {len(changes)} files that would be modified:")
+        for filepath, original, updated in changes:
+            print(f"\nFile: {filepath}")
+            self._show_changes(original, updated)
+
+        if not dry_run:
+            if bulk_confirm:
+                if not self._confirm_action(f"Add line after '{match_keyword}' in {len(changes)} files"):
+                    print("Skipped (user canceled bulk operation)")
+                    return 0
+            else:
+                print("\nProcessing files individually...")
+
+        for filepath, original, updated in changes:
+            if not dry_run:
+                if bulk_confirm or self._confirm_action(f"Add line after '{match_keyword}' in {filepath}"):
+                    try:
+                        with open(filepath, 'w') as f:
+                            f.writelines(updated)
+                        modified += 1
+                        print(f"Updated {filepath}")
+                    except Exception as e:
+                        print(f"Error updating {filepath}: {str(e)}")
+                else:
+                    print(f"Skipped {filepath}")
+            else:
+                print(f"[Dry-run] Would update {filepath}")
+
         return modified
 
     def bulk_add_before(self, match_keyword: str, new_line: str, first_only: bool = False,
-                        dry_run: bool = False) -> int:
+                        dry_run: bool = False, bulk_confirm: bool = False) -> int:
         """Add a new line before each line containing match_keyword"""
         modified = 0
+        changes = []
+
         for filepath in self.matches:
             try:
                 with open(filepath, 'r') as f:
@@ -256,18 +390,42 @@ class Perseus:
                         updated_lines.append(line)
 
                 if inserted and lines != updated_lines:
-                    print(f"\nFile: {filepath}")
-                    self._show_changes(lines, updated_lines)
-
-                    if not dry_run and self._confirm_action(f"Add line before '{match_keyword}'"):
-                        with open(filepath, 'w') as f:
-                            f.writelines(updated_lines)
-                        modified += 1
-                        print("Line(s) added")
-                    else:
-                        print("Skipped (dry-run or user canceled)")
+                    changes.append((filepath, lines, updated_lines))
             except Exception as e:
                 print(f"Error processing {filepath}: {str(e)}")
+
+        if not changes:
+            print("No changes needed.")
+            return 0
+
+        print(f"\nFound {len(changes)} files that would be modified:")
+        for filepath, original, updated in changes:
+            print(f"\nFile: {filepath}")
+            self._show_changes(original, updated)
+
+        if not dry_run:
+            if bulk_confirm:
+                if not self._confirm_action(f"Add line before '{match_keyword}' in {len(changes)} files"):
+                    print("Skipped (user canceled bulk operation)")
+                    return 0
+            else:
+                print("\nProcessing files individually...")
+
+        for filepath, original, updated in changes:
+            if not dry_run:
+                if bulk_confirm or self._confirm_action(f"Add line before '{match_keyword}' in {filepath}"):
+                    try:
+                        with open(filepath, 'w') as f:
+                            f.writelines(updated)
+                        modified += 1
+                        print(f"Updated {filepath}")
+                    except Exception as e:
+                        print(f"Error updating {filepath}: {str(e)}")
+                else:
+                    print(f"Skipped {filepath}")
+            else:
+                print(f"[Dry-run] Would update {filepath}")
+
         return modified
 
     def output_filenames(self, output_file: str = None, trim_paths: bool = False, single_line: bool = False):
@@ -334,6 +492,9 @@ class Perseus:
 
     6. Dry-run preview:
        Add --dry-run to any command to preview changes
+
+    7. Bulk confirmation:
+       Add --bulk-confirm to approve all changes at once
     """)
 
 
@@ -360,18 +521,20 @@ def main():
                         help="Trim paths to only include 'tests/' portion")
     parser.add_argument("--single-line", action="store_true",
                         help="Output filenames as single space-separated line")
+    parser.add_argument("--bulk-confirm", action="store_true",
+                        help="Confirm all changes at once rather than per file")
 
     args = parser.parse_args()
 
     if args.help_examples:
-        Perseus.show_help()
+        TestLabelFinder.show_help()
         sys.exit(0)
 
     if not args.path or not args.keywords:
         parser.print_help()
         sys.exit(1)
 
-    finder = Perseus(args.path, args.keywords, args.exclude_keywords)
+    finder = TestLabelFinder(args.path, args.keywords, args.exclude_keywords)
     finder.find_matches()
 
     if args.output or args.trim_paths or args.single_line:
@@ -382,21 +545,21 @@ def main():
         finder.print_results()
 
     if args.replace:
-        finder.bulk_replace(args.replace[0], args.replace[1], args.dry_run)
+        finder.bulk_replace(args.replace[0], args.replace[1], args.dry_run, args.bulk_confirm)
     elif args.remove:
-        finder.bulk_remove_keyword(args.remove, args.dry_run)
+        finder.bulk_remove_keyword(args.remove, args.dry_run, args.bulk_confirm)
     elif args.add:
-        finder.bulk_add_keyword(args.add, dry_run=args.dry_run)
+        finder.bulk_add_keyword(args.add, dry_run=args.dry_run, bulk_confirm=args.bulk_confirm)
     elif args.remove_lines:
-        finder.bulk_remove_lines(args.remove_lines, args.dry_run)
+        finder.bulk_remove_lines(args.remove_lines, args.dry_run, args.bulk_confirm)
     elif args.replace_lines:
-        finder.bulk_replace_lines(args.replace_lines[0], args.replace_lines[1], args.dry_run)
+        finder.bulk_replace_lines(args.replace_lines[0], args.replace_lines[1], args.dry_run, args.bulk_confirm)
     elif args.add_after:
         finder.bulk_add_after(args.add_after[0], args.add_after[1], first_only=args.first_only,
-                              dry_run=args.dry_run)
+                              dry_run=args.dry_run, bulk_confirm=args.bulk_confirm)
     elif args.add_before:
         finder.bulk_add_before(args.add_before[0], args.add_before[1], first_only=args.first_only,
-                               dry_run=args.dry_run)
+                               dry_run=args.dry_run, bulk_confirm=args.bulk_confirm)
 
 
 if __name__ == "__main__":
