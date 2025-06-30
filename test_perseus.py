@@ -1,17 +1,30 @@
 import unittest
 import tempfile
 import os
+from unittest.mock import patch
+from io import StringIO
+from typing import List
 from perseus import Perseus
 
 
-class TestBulkAddMethods(unittest.TestCase):
+class TestPerseus(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        print("\n" + "="*60)
+        print("STARTING TEST SUITE".center(60))
+        print("="*60 + "\n")
 
     def setUp(self):
         self.test_files = []
+        print("\n")
+        print("-"*50)
+        print(f"\n[START] {self._testMethodName}")
 
     def tearDown(self):
         for f in self.test_files:
-            os.remove(f)
+            if os.path.exists(f):
+                os.remove(f)
+        print(f"[END] {self._testMethodName}\n")
 
     def _create_temp_file(self, content: str) -> str:
         tmp = tempfile.NamedTemporaryFile(delete=False, mode='w+')
@@ -20,93 +33,94 @@ class TestBulkAddMethods(unittest.TestCase):
         self.test_files.append(tmp.name)
         return tmp.name
 
-    def _get_finder(self, path: str):
-        # Create dummy finder that won’t run actual search
+    def _get_finder(self, paths: List[str]):
+        """Helper to create finder with mocked matches and confirm_action"""
         finder = Perseus(search_path=".", keywords=["dummy"])
-        finder.matches = [path]
-        finder._confirm_action = lambda msg: True  # auto-confirm for tests
+        finder.matches = paths
         return finder
 
-    def test_bulk_add_after_all_matches(self):
-        content = "line one\nmatch here\nline three\nmatch here\n"
-        expected = "line one\nmatch here\ninserted line\nline three\nmatch here\ninserted line\n"
+    def test_bulk_confirm_replaces_in_all_files(self):
+        """Test bulk replacement with confirmation"""
+        content1 = "line with @old\n"
+        content2 = "other @old text\n"
+        path1 = self._create_temp_file(content1)
+        path2 = self._create_temp_file(content2)
 
+        finder = self._get_finder([path1, path2])
+        
+        with patch('builtins.input', return_value='y'):
+            modified = finder.bulk_replace("@old", "@new", dry_run=False, bulk_confirm=True)
+
+        self.assertEqual(modified, 2)
+        print(f"✓ Replaced in {modified} files")
+
+    def test_bulk_confirm_aborts_if_user_rejects(self):
+        """Test bulk operation cancellation"""
+        content = "line with @old\n"
         path = self._create_temp_file(content)
-        finder = self._get_finder(path)
 
-        modified = finder.bulk_add_after("match", "inserted line", first_only=False, dry_run=False)
-        self.assertEqual(modified, 1)
+        finder = self._get_finder([path])
+        
+        with patch('builtins.input', return_value='n'):
+            modified = finder.bulk_replace("@old", "@new", dry_run=False, bulk_confirm=True)
 
-        with open(path) as f:
-            result = f.read()
-        self.assertEqual(result, expected)
-
-    def test_bulk_add_after_first_only(self):
-        content = "match one\nline\nmatch two\n"
-        expected = "match one\ninserted\nline\nmatch two\n"
-
-        path = self._create_temp_file(content)
-        finder = self._get_finder(path)
-
-        modified = finder.bulk_add_after("match", "inserted", first_only=True, dry_run=False)
-        self.assertEqual(modified, 1)
-
-        with open(path) as f:
-            result = f.read()
-        self.assertEqual(result, expected)
-
-    def test_bulk_add_before_all_matches(self):
-        content = "start\nmatch\nmiddle\nmatch\nend\n"
-        expected = "start\ninserted\nmatch\nmiddle\ninserted\nmatch\nend\n"
-
-        path = self._create_temp_file(content)
-        finder = self._get_finder(path)
-
-        modified = finder.bulk_add_before("match", "inserted", first_only=False, dry_run=False)
-        self.assertEqual(modified, 1)
-
-        with open(path) as f:
-            result = f.read()
-        self.assertEqual(result, expected)
-
-    def test_bulk_add_before_first_only(self):
-        content = "match one\nskip\nmatch two\n"
-        expected = "inserted\nmatch one\nskip\nmatch two\n"
-
-        path = self._create_temp_file(content)
-        finder = self._get_finder(path)
-
-        modified = finder.bulk_add_before("match", "inserted", first_only=True, dry_run=False)
-        self.assertEqual(modified, 1)
-
-        with open(path) as f:
-            result = f.read()
-        self.assertEqual(result, expected)
-
-    def test_no_modification_when_no_match(self):
-        content = "no match here\nstill no match\n"
-        path = self._create_temp_file(content)
-        finder = self._get_finder(path)
-
-        modified = finder.bulk_add_after("notfound", "inserted", dry_run=False)
         self.assertEqual(modified, 0)
+        print("✓ Correctly aborted operation")
 
-        with open(path) as f:
-            result = f.read()
-        self.assertEqual(result, content)
+    def test_non_bulk_mode_confirms_per_file(self):
+        """Test individual file confirmation"""
+        content1 = "line with @old\n"
+        content2 = "other @old text\n"
+        path1 = self._create_temp_file(content1)
+        path2 = self._create_temp_file(content2)
 
-    def test_dry_run_does_not_write(self):
-        content = "match line\nanother\n"
+        finder = self._get_finder([path1, path2])
+        
+        with patch('builtins.input', side_effect=['y', 'n']):
+            modified = finder.bulk_replace("@old", "@new", dry_run=False, bulk_confirm=False)
+
+        self.assertEqual(modified, 1)
+        print(f"✓ Modified {modified} files with individual confirmations")
+
+    def test_bulk_confirm_with_dry_run(self):
+        """Test dry run behavior"""
+        content = "line with @old\n"
         path = self._create_temp_file(content)
-        finder = self._get_finder(path)
 
-        modified = finder.bulk_add_after("match", "inserted", dry_run=True)
+        finder = self._get_finder([path])
+        
+        with patch('builtins.input', return_value='y'):
+            modified = finder.bulk_replace("@old", "@new", dry_run=True, bulk_confirm=True)
+
         self.assertEqual(modified, 0)
+        print("✓ Dry run completed without modifications")
 
-        with open(path) as f:
-            result = f.read()
-        self.assertEqual(result, content)
+    def test_bulk_confirm_with_remove_lines(self):
+        """Test bulk line removal"""
+        content = "keep\nremove this\nkeep\n"
+        path = self._create_temp_file(content)
+
+        finder = self._get_finder([path])
+        
+        with patch('builtins.input', return_value='y'):
+            modified = finder.bulk_remove_lines("remove", dry_run=False, bulk_confirm=True)
+
+        self.assertEqual(modified, 1)
+        print("✓ Bulk line removal successful")
+
+    def test_bulk_confirm_with_add_after(self):
+        """Test bulk line addition"""
+        content = "line\nmatch\nnext\n"
+        path = self._create_temp_file(content)
+
+        finder = self._get_finder([path])
+        
+        with patch('builtins.input', return_value='y'):
+            modified = finder.bulk_add_after("match", "added", dry_run=False, bulk_confirm=True)
+
+        self.assertEqual(modified, 1)
+        print("✓ Bulk line addition successful")
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)

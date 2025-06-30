@@ -7,7 +7,7 @@ from typing import List, Dict, Tuple, Optional, Callable
 
 
 class Perseus:
-        def __init__(self, search_path: str, keywords: List[str], exclude_keywords: Optional[List[str]] = None):
+    def __init__(self, search_path: str, keywords: List[str], exclude_keywords: Optional[List[str]] = None):
         """Initialize with search path and keywords to find"""
         self.search_path = os.path.abspath(search_path)
         self.keywords = [k.lower() for k in keywords]
