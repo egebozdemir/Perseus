@@ -39,6 +39,69 @@ class TestPerseus(unittest.TestCase):
         finder.matches = paths
         return finder
 
+    def test_bulk_remove_files_confirmed(self):
+        """Test file removal with confirmation"""
+        content1 = "test file content\n"
+        content2 = "another test file\n"
+        path1 = self._create_temp_file(content1)
+        path2 = self._create_temp_file(content2)
+
+        finder = self._get_finder([path1, path2])
+        
+        with patch('builtins.input', return_value='y'):
+            removed = finder.bulk_remove_files(dry_run=False, bulk_confirm=True)
+
+        self.assertEqual(removed, 2)
+        self.assertFalse(os.path.exists(path1))
+        self.assertFalse(os.path.exists(path2))
+        print("✓ Successfully removed files with bulk confirmation")
+
+    def test_bulk_remove_files_aborted(self):
+        """Test file removal cancellation"""
+        content = "test file content\n"
+        path = self._create_temp_file(content)
+
+        finder = self._get_finder([path])
+        
+        with patch('builtins.input', return_value='n'):
+            removed = finder.bulk_remove_files(dry_run=False, bulk_confirm=True)
+
+        self.assertEqual(removed, 0)
+        self.assertTrue(os.path.exists(path))
+        print("✓ Correctly aborted file removal")
+
+    def test_bulk_remove_files_dry_run(self):
+        """Test dry run file removal"""
+        content = "test file content\n"
+        path = self._create_temp_file(content)
+
+        finder = self._get_finder([path])
+        
+        with patch('builtins.input', return_value='y'):
+            removed = finder.bulk_remove_files(dry_run=True, bulk_confirm=True)
+
+        self.assertEqual(removed, 0)
+        self.assertTrue(os.path.exists(path))
+        print("✓ Dry run correctly skipped file removal")
+
+    def test_bulk_remove_files_individual_confirmation(self):
+        """Test individual file confirmation"""
+        content1 = "test file 1\n"
+        content2 = "test file 2\n"
+        path1 = self._create_temp_file(content1)
+        path2 = self._create_temp_file(content2)
+
+        finder = self._get_finder([path1, path2])
+        
+        with patch('builtins.input', side_effect=['y', 'n']):
+            removed = finder.bulk_remove_files(dry_run=False, bulk_confirm=False)
+
+        self.assertEqual(removed, 1)
+        self.assertFalse(os.path.exists(path1))
+        self.assertTrue(os.path.exists(path2))
+        print("✓ Correctly handled individual file confirmations")
+
+    # Existing tests remain unchanged...
     def test_bulk_confirm_replaces_in_all_files(self):
         """Test bulk replacement with confirmation"""
         content1 = "line with @old\n"

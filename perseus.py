@@ -428,6 +428,41 @@ class Perseus:
 
         return modified
 
+    def bulk_remove_files(self, dry_run: bool = False, bulk_confirm: bool = False) -> int:
+        """Remove entire files that match the search criteria"""
+        if not self.matches:
+            print("No matching files to remove.")
+            return 0
+
+        print(f"\nFound {len(self.matches)} files that would be removed:")
+        for filepath in self.matches:
+            print(f"  - {filepath}")
+
+        if not dry_run:
+            if bulk_confirm:
+                if not self._confirm_action(f"Remove {len(self.matches)} files permanently"):
+                    print("Skipped (user canceled bulk removal)")
+                    return 0
+            else:
+                print("\nProcessing files individually...")
+
+        removed_count = 0
+        for filepath in self.matches:
+            if not dry_run:
+                if bulk_confirm or self._confirm_action(f"Remove file: {filepath}"):
+                    try:
+                        os.remove(filepath)
+                        removed_count += 1
+                        print(f"Removed {filepath}")
+                    except Exception as e:
+                        print(f"Error removing {filepath}: {str(e)}")
+                else:
+                    print(f"Skipped {filepath}")
+            else:
+                print(f"[Dry-run] Would remove {filepath}")
+
+        return removed_count
+
     def output_filenames(self, output_file: str = None, trim_paths: bool = False, single_line: bool = False):
         """
         Output matched filenames with various formatting options
@@ -523,18 +558,20 @@ def main():
                         help="Output filenames as single space-separated line")
     parser.add_argument("--bulk-confirm", action="store_true",
                         help="Confirm all changes at once rather than per file")
+    parser.add_argument("--remove-file", action="store_true",
+                        help="Remove entire files that match the search criteria")
 
     args = parser.parse_args()
 
     if args.help_examples:
-        TestLabelFinder.show_help()
+        Perseus.show_help()
         sys.exit(0)
 
     if not args.path or not args.keywords:
         parser.print_help()
         sys.exit(1)
 
-    finder = TestLabelFinder(args.path, args.keywords, args.exclude_keywords)
+    finder = Perseus(args.path, args.keywords, args.exclude_keywords)
     finder.find_matches()
 
     if args.output or args.trim_paths or args.single_line:
@@ -560,6 +597,9 @@ def main():
     elif args.add_before:
         finder.bulk_add_before(args.add_before[0], args.add_before[1], first_only=args.first_only,
                                dry_run=args.dry_run, bulk_confirm=args.bulk_confirm)
+    elif args.remove_file:
+        removed = finder.bulk_remove_files(dry_run=args.dry_run, bulk_confirm=args.bulk_confirm)
+        print(f"\nRemoved {removed} files")
 
 
 if __name__ == "__main__":
